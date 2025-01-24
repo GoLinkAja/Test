@@ -1,0 +1,71 @@
+name: MiHomo-Alpha
+on:
+  - workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: Alpha
+      - name: Get Latest tag
+        id: latest_tag
+        uses: pozetroninc/github-action-get-latest-release@master
+        with:
+          repository: MetaCubeX/mihomo
+          excludes: prerelease, draft
+      - name: Versioning
+        run: |
+          # Versioning Script
+          sudo timedatectl set-timezone "Asia/Jakarta"
+          echo "NAME=mihomo" >> $GITHUB_ENV
+          BUILDTIME=$(date)
+          echo "BUILDTIME=$BUILDTIME" >> $GITHUB_ENV
+          HASH_COMMIT=$(git rev-parse --short HEAD)
+          echo "URL_COMMIT=https://www.github.com/metacubex/mihomo/commit/$HASH_COMMIT" >> $GITHUB_ENV
+          COMMIT=$(git log --oneline -n 5 --no-decorate | sed 's/^[0-9a-f]* //' | sed 's/^/— /')
+          echo "COMMIT=$COMMIT" >> $GITHUB_ENV
+          VERSION=${{ steps.latest_tag.outputs.release }}-${HASH_COMMIT}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAGS=with_gvisor,with_low_memory" >> $GITHUB_ENV
+          echo "LDFLAGS=-X 'github.com/metacubex/mihomo/constant.Version=${VERSION}' -X 'github.com/metacubex/mihomo/constant.BuildTime=${BUILDTIME}' -w -s -buildid=" >> $GITHUB_ENV
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: stable
+      - name: Build
+        run: |
+          # Build the project
+          GOARCH=arm64 GOOS=android go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}
+      - name: Archive
+        id: archive
+        run: |
+          # Archive the build output
+          GZ="${NAME}-android-arm64-${VERSION}.tgz"
+          tar -caf $GZ ./${NAME}
+          echo "gz=$GZ" >> $GITHUB_OUTPUT
+          SHA=$(cat $GZ 2>/dev/null | sha256sum | cut -d ' ' -f1)
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+      - name: Setup jq
+        uses: dcarbone/install-jq-action@v2
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+        with:
+          tag_name: ${{ env.VERSION }}
+          release_name: Release ${{ env.VERSION }}
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.archive.outputs.gz }}
+          asset_name: ${{ steps.archive.outputs.gz }}
+          asset_content_type: application/gzip
