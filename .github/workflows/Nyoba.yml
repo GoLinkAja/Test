@@ -125,7 +125,7 @@ jobs:
 
       - name: Load VERSION
         run: |
-          VERSION=$(cat bin/version.txt)
+          VERSION=$(cat version.txt)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Tag Repo
