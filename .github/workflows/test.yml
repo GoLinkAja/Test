@@ -1,4 +1,4 @@
-name: MiHomo-Alpha
+name: MiHomo-Create
 on:
   - workflow_dispatch
 jobs:
