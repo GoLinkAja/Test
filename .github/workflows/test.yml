@@ -1,66 +1,77 @@
-name: MiHomo-creator
+name: MiHomo-Alpha
 on:
-  workflow_dispatch:
+  - workflow_dispatch
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
-          - { GOOS: android, GOARCH: arm64, CC: /opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-clang }
-          - { GOOS: android, GOARCH: arm, CC: /opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi-clang }
-          - { GOOS: linux, GOARCH: arm64, CC: gcc }
-          - { GOOS: linux, GOARCH: arm, CC: arm-linux-gnueabihf-gcc }
+        jobs:
+          - { goos: linux, goarch: arm64, output: arm64 }
+          - { goos: linux, goarch: arm, goarm: '7', output: armv7 }
+          - { goos: android, goarch: arm, ndk: armv7a-linux-androideabi34, output: armv7 }
+          - { goos: android, goarch: arm64, ndk: aarch64-linux-android34, output: arm64-v8 }
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           repository: MetaCubeX/mihomo
           ref: Alpha
+          
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
 
-      - name: Get Latest Tag
+      - name: Get Latest tag
         id: latest_tag
         uses: pozetroninc/github-action-get-latest-release@master
         with:
           repository: MetaCubeX/mihomo
-          excludes: draft
-
-      - name: Versioning
+          excludes: prerelease, draft
+          
+      - name: Set Time Variable
         run: |
-          # Versioning Script
           sudo timedatectl set-timezone "Asia/Jakarta"
           echo "NAME=mihomo" >> $GITHUB_ENV
-          BUILDTIME=$(date)
-          echo "BUILDTIME=$BUILDTIME" >> $GITHUB_ENV
+          echo "BUILDTIME=$(date)" >> $GITHUB_ENV
+          echo "CGO_ENABLED=0" >> $GITHUB_ENV
           HASH_COMMIT=$(git rev-parse --short HEAD)
           echo "URL_COMMIT=https://www.github.com/metacubex/mihomo/commit/$HASH_COMMIT" >> $GITHUB_ENV
-          COMMIT=$(git log --oneline -n 5 --no-decorate | sed 's/^[0-9a-f]* //' | sed 's/^/— /')
-          echo "COMMIT=$COMMIT" >> $GITHUB_ENV
           VERSION=${{ steps.latest_tag.outputs.release }}-${HASH_COMMIT}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "TAGS=with_gvisor,with_low_memory" >> $GITHUB_ENV
           echo "LDFLAGS=-X 'github.com/metacubex/mihomo/constant.Version=${VERSION}' -X 'github.com/metacubex/mihomo/constant.BuildTime=${BUILDTIME}' -w -s -buildid=" >> $GITHUB_ENV
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
+      
+      - name: Setup NDK
+        if: ${{ matrix.jobs.goos == 'android' }}
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
         with:
-          go-version: stable
+          ndk-version: r28-beta1
+          
+      - name: Set NDK path
+        if: ${{ matrix.jobs.goos == 'android' }}
+        run: |
+          echo "CC=${{steps.setup-ndk.outputs.ndk-path}}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{matrix.jobs.ndk}}-clang" >> $GITHUB_ENV
+          echo "CGO_ENABLED=1" >> $GITHUB_ENV
 
       - name: Build
+        env:
+          GOOS: ${{matrix.jobs.goos}}
+          GOARCH: ${{matrix.jobs.goarch}}
+          GOARM: ${{matrix.jobs.goarm}}
         run: |
-          # Build the project
-          CGO_ENABLED=1 CC=${{ matrix.target.CC }} \
-          GOARCH=${{ matrix.target.GOARCH }} GOOS=${{ matrix.target.GOOS }} \
-          go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}-${{ matrix.target.GOOS }}-${{ matrix.target.GOARCH }}
-
+          go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}-${GOOS}-${GOARCH}
+          
       - name: Archive
         id: archive
         run: |
-          # Archive the build output
-          GZ="${NAME}-${{ matrix.target.GOOS }}-${{ matrix.target.GOARCH }}-${VERSION}.tgz"
-          tar -caf $GZ ./${NAME}-${{ matrix.target.GOOS }}-${{ matrix.target.GOARCH }}
+          # Archive the build output with a unique name
+          GZ="${NAME}-${GOOS}-${GOARCH}-${VERSION}.tgz"
+          tar -caf $GZ ./${NAME}-${GOOS}-${GOARCH}
           echo "gz=$GZ" >> $GITHUB_OUTPUT
-          SHA=$(sha256sum $GZ | cut -d ' ' -f1)
+          SHA=$(cat $GZ 2>/dev/null | sha256sum | cut -d ' ' -f1)
           echo "sha=$SHA" >> $GITHUB_OUTPUT
 
       - name: Setup jq
@@ -77,7 +88,8 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload Release Asset
+      - name: Upload Release Asset for Linux ARM64
+        if: ${{ matrix.jobs.goos == 'linux' && matrix.jobs.goarch == 'arm64' }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
@@ -86,3 +98,16 @@ jobs:
           asset_path: ${{ steps.archive.outputs.gz }}
           asset_name: ${{ steps.archive.outputs.gz }}
           asset_content_type: application/gzip
+
+      - name: Upload Release Asset for Android ARM64
+        if: ${{ matrix.jobs.goos == 'android' && matrix.jobs.goarch == 'arm64' }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.archive.outputs.gz }}
+          asset_name: ${{ steps.archive.outputs.gz }}
+          asset_content_type: application/gzip
+
+      # Repeat similar upload steps for other GOOS/GOARCH combinations
