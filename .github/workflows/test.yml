@@ -19,6 +19,13 @@ jobs:
           repository: MetaCubeX/mihomo
           ref: Alpha
 
+      - name: Get Latest tag
+        id: latest_tag
+        uses: pozetroninc/github-action-get-latest-release@master
+        with:
+          repository: MetaCubeX/mihomo
+          excludes: prerelease, draft
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -42,7 +49,7 @@ jobs:
           echo "CGO_ENABLED=0" >> $GITHUB_ENV
           HASH_COMMIT=$(git rev-parse --short HEAD)
           echo "URL_COMMIT=https://www.github.com/metacubex/mihomo/commit/$HASH_COMMIT" >> $GITHUB_ENV
-          VERSION="v1.2.3-${HASH_COMMIT}"  # Ganti sesuai format tag
+         VERSION=${{ steps.latest_tag.outputs.release }}-${HASH_COMMIT}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "TAGS=with_gvisor,with_low_memory" >> $GITHUB_ENV
           echo "BUILDTAG=-extldflags --static" >> $GITHUB_ENV
@@ -80,6 +87,7 @@ jobs:
         run: |
           echo "Building for ${GOOS}/${GOARCH}..."
           go build -tags "${TAGS}" -trimpath -ldflags "${LDFLAGS}"
+          echo 'go build -tags "${TAGS}" -trimpath -ldflags "${LDFLAGS}"'
           cp mihomo mihomo-${GOOS}-${GOOUTPUT}
           gzip -c mihomo-${GOOS}-${GOOUTPUT} > mihomo-${GOOS}-${GOOUTPUT}-${VERSION}.gz
           rm mihomo-${GOOS}-${GOOUTPUT}
