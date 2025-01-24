@@ -52,6 +52,7 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "TAGS=with_gvisor,with_low_memory" >> $GITHUB_ENV
           BUILDTAG="-extldflags --static"
+          echo "GOTOOLCHAIN=local" >> $GITHUB_ENV
           echo "LDFLAGS=$BUILDTAG -X 'github.com/metacubex/mihomo/constant.Version=$VERSION' -X 'github.com/metacubex/mihomo/constant.BuildTime=$BUILDTIME' -w -s -buildid=" >> $GITHUB_ENV
 
       - name: Setup NDK
