@@ -111,7 +111,7 @@ jobs:
       - name: Tag Repo
         uses: richardsimko/update-tag@v1
         with:
-          tag_name: Release-${{ env.VERSION }}
+          tag_name: 'Release-${VERSION}'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
@@ -119,8 +119,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: ${{ success() }}
         with:
-          tag_name: Release-${{ env.VERSION }}
+          tag_name: 'Release-${VERSION}'
           files: |
             bin/*
           generate_release_notes: true
-          body_path: release.txt
