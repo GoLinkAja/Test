@@ -15,7 +15,7 @@ jobs:
         uses: pozetroninc/github-action-get-latest-release@master
         with:
           repository: MetaCubeX/mihomo
-          excludes: prerelease, draft
+          excludes: draft
       - name: Versioning
         run: |
           # Versioning Script
