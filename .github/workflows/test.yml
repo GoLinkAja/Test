@@ -62,8 +62,19 @@ jobs:
           GOARCH: ${{matrix.jobs.goarch}}
           GOARM: ${{matrix.jobs.goarm}}
         run: |
+          echo "Building for ${GOOS}/${GOARCH}..."
+          go env
           go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}-${GOOS}-${GOARCH}
-          
+          echo "Build complete. Checking for the file:"
+          ls -la
+
+      - name: Check for binary before archiving
+        run: |
+          if [ ! -f ./${NAME}-${GOOS}-${GOARCH} ]; then
+            echo "Error: Binary not found for ${GOOS}/${GOARCH}!"
+            exit 1
+          fi
+
       - name: Archive
         id: archive
         run: |
