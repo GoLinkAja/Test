@@ -76,14 +76,14 @@ jobs:
         run: |
           echo "Building for ${GOOS}/${GOARCH}..."
           go env
-          go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}
-          echo 'go build -tags ${{TAGS}} -trimpath -ldflags "${{LDFLAGS}}" -o ./${{NAME}}'
+          go build -tags "${TAGS}" -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}
+          echo "Build command: go build -tags '${TAGS}' -trimpath -ldflags '${LDFLAGS}' -o './${NAME}'"
       
       - name: Archive Build Output
         id: archive
         run: |
           ARCHIVE_NAME="${NAME}-${GOOS}-${GOOUTPUT}-${VERSION}.tgz"
-          echo 'hasil = ${ARCHIVE_NAME}'
+          echo "Creating archive: ${ARCHIVE_NAME}"
           tar -caf $ARCHIVE_NAME ./${NAME}
           echo "gz=$ARCHIVE_NAME" >> $GITHUB_OUTPUT
           SHA256=$(sha256sum $ARCHIVE_NAME | cut -d ' ' -f1)
@@ -112,4 +112,3 @@ jobs:
           asset_path: ${{ steps.archive.outputs.gz }}
           asset_name: ${{ steps.archive.outputs.gz }}
           asset_content_type: application/gzip
-
