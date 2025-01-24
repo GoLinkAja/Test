@@ -38,6 +38,7 @@ jobs:
       - name: Build
         run: |
           # Build the project
+          CGO_ENABLE=1 CC=/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-clang \
           GOARCH=arm64 GOOS=android go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}
       - name: Archive
         id: archive
