@@ -1,4 +1,4 @@
-name: MiHomo-Creator
+name: MiHomo-Alpha
 on:
   workflow_dispatch:
 jobs:
@@ -7,9 +7,9 @@ jobs:
     strategy:
       matrix:
         target:
-          - { GOOS: android, GOARCH: arm64, CC: /opt/android-ndk/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-clang }
-          - { GOOS: android, GOARCH: arm, CC: /opt/android-ndk/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi-clang }
-          - { GOOS: linux, GOARCH: arm64, CC: aarch64-linux-gnu-gcc }
+          - { GOOS: android, GOARCH: arm64, CC: /opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-clang }
+          - { GOOS: android, GOARCH: arm, CC: /opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi-clang }
+          - { GOOS: linux, GOARCH: arm64, CC: gcc }
           - { GOOS: linux, GOARCH: arm, CC: arm-linux-gnueabihf-gcc }
     steps:
       - name: Checkout
@@ -17,30 +17,6 @@ jobs:
         with:
           repository: MetaCubeX/mihomo
           ref: Alpha
-
-      - name: Cache Android NDK
-        id: cache-ndk
-        uses: actions/cache@v3
-        with:
-          path: /opt/android-ndk
-          key: android-ndk-r25b-${{ runner.os }}
-          restore-keys: |
-            android-ndk-
-
-      - name: Install Android NDK
-        if: steps.cache-ndk.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p /opt/android-ndk
-          curl -sSL https://dl.google.com/android/repository/android-ndk-r25b-linux.zip -o ndk.zip
-          unzip ndk.zip -d /opt/android-ndk
-          export ANDROID_NDK_HOME=/opt/android-ndk/android-ndk-r25b
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
-          echo "/opt/android-ndk/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $PATH
-
-      - name: Install Cross-Compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
 
       - name: Get Latest Tag
         id: latest_tag
@@ -51,6 +27,7 @@ jobs:
 
       - name: Versioning
         run: |
+          # Versioning Script
           sudo timedatectl set-timezone "Asia/Jakarta"
           echo "NAME=mihomo" >> $GITHUB_ENV
           BUILDTIME=$(date)
@@ -71,6 +48,7 @@ jobs:
 
       - name: Build
         run: |
+          # Build the project
           CGO_ENABLED=1 CC=${{ matrix.target.CC }} \
           GOARCH=${{ matrix.target.GOARCH }} GOOS=${{ matrix.target.GOOS }} \
           go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}-${{ matrix.target.GOOS }}-${{ matrix.target.GOARCH }}
@@ -78,33 +56,33 @@ jobs:
       - name: Archive
         id: archive
         run: |
+          # Archive the build output
           GZ="${NAME}-${{ matrix.target.GOOS }}-${{ matrix.target.GOARCH }}-${VERSION}.tgz"
           tar -caf $GZ ./${NAME}-${{ matrix.target.GOOS }}-${{ matrix.target.GOARCH }}
           echo "gz=$GZ" >> $GITHUB_OUTPUT
           SHA=$(sha256sum $GZ | cut -d ' ' -f1)
           echo "sha=$SHA" >> $GITHUB_OUTPUT
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
+      - name: Setup jq
+        uses: dcarbone/install-jq-action@v2
+
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
         with:
-          tag_name: ${{ needs.build.outputs.VERSION }}
-          release_name: Release ${{ needs.build.outputs.VERSION }}
+          tag_name: ${{ env.VERSION }}
+          release_name: Release ${{ env.VERSION }}
           draft: false
           prerelease: false
 
-      - name: Upload All Release Assets
+      - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ needs.build.outputs.gz }}
-          asset_name: ${{ needs.build.outputs.gz }}
+          asset_path: ${{ steps.archive.outputs.gz }}
+          asset_name: ${{ steps.archive.outputs.gz }}
           asset_content_type: application/gzip
