@@ -112,6 +112,11 @@ jobs:
         with:
           path: bin/
 
+      - name: Load VERSION
+        run: |
+          VERSION=$(cat bin/version.txt)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Tag Repo
         uses: richardsimko/update-tag@v1
         with:
