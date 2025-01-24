@@ -18,7 +18,7 @@ jobs:
         with:
           repository: MetaCubeX/mihomo
           ref: Alpha
-          
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -40,7 +40,7 @@ jobs:
         with:
           repository: MetaCubeX/mihomo
           excludes: prerelease, draft
-          
+
       - name: Set Time and Build Variables
         run: |
           sudo timedatectl set-timezone "Asia/Jakarta"
@@ -53,14 +53,14 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "TAGS=with_gvisor,with_low_memory" >> $GITHUB_ENV
           echo "LDFLAGS=-X 'github.com/metacubex/mihomo/constant.Version=${VERSION}' -X 'github.com/metacubex/mihomo/constant.BuildTime=$(date)' -w -s -buildid=" >> $GITHUB_ENV
-      
+
       - name: Setup NDK for Android
         if: ${{ matrix.jobs.goos == 'android' }}
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
           ndk-version: r28-beta1
-          
+
       - name: Set NDK Path and Enable CGO
         if: ${{ matrix.jobs.goos == 'android' }}
         run: |
@@ -76,27 +76,17 @@ jobs:
         run: |
           echo "Building for ${GOOS}/${GOARCH}..."
           go env
-          go build -tags "${TAGS}" -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}
-          echo "Build command: go build -tags '${TAGS}' -trimpath -ldflags '${LDFLAGS}' -o './${NAME}'"
-      
-      - name: Archive Build Output
-        id: archive
-        env:
-          NAME: ${{ env.NAME }}
-          GOOS: ${{ matrix.jobs.goos }}
-          GOOUTPUT: ${{ matrix.jobs.output }}
-          VERSION: ${{ env.VERSION }}
+          go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}-${GOOS}-${GOOUTPUT}-${VERSION}
+
+      - name: Collect All Build Outputs
         run: |
-          ARCHIVE_NAME="${NAME}-${GOOS}-${GOOUTPUT}-${VERSION}.tgz"
-          echo "Creating archive: ${ARCHIVE_NAME}"
-          tar -caf $ARCHIVE_NAME ./${NAME}
-          echo "gz=$ARCHIVE_NAME" >> $GITHUB_OUTPUT
-          SHA256=$(sha256sum $ARCHIVE_NAME | cut -d ' ' -f1)
-          echo "sha=$SHA256" >> $GITHUB_OUTPUT
-
-      - name: Setup jq
-        uses: dcarbone/install-jq-action@v2
-
+          mkdir -p build_outputs
+          mv ${NAME}* build_outputs/
+          ls -lah build_outputs
+  
+  Upload:
+    runs-on: ubuntu-latest
+    steps:
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
@@ -108,12 +98,13 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.archive.outputs.gz }}
-          asset_name: ${{ steps.archive.outputs.gz }}
-          asset_content_type: application/gzip
+      - name: Upload All Release Assets
+        run: |
+          for file in build_outputs/*; do
+            echo "Uploading $file..."
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GIT_TOKEN }}" \
+              -H "Content-Type: application/gzip" \
+              --data-binary @$file \
+              "${{ steps.create_release.outputs.upload_url }}?name=$(basename $file)"
+          done
