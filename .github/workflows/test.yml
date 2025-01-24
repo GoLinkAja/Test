@@ -1,0 +1,110 @@
+name: MiHomo-Creator
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - { GOOS: android, GOARCH: arm64, CC: /opt/android-ndk/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-clang }
+          - { GOOS: android, GOARCH: arm, CC: /opt/android-ndk/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi-clang }
+          - { GOOS: linux, GOARCH: arm64, CC: aarch64-linux-gnu-gcc }
+          - { GOOS: linux, GOARCH: arm, CC: arm-linux-gnueabihf-gcc }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: Alpha
+
+      - name: Cache Android NDK
+        id: cache-ndk
+        uses: actions/cache@v3
+        with:
+          path: /opt/android-ndk
+          key: android-ndk-r25b-${{ runner.os }}
+          restore-keys: |
+            android-ndk-
+
+      - name: Install Android NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /opt/android-ndk
+          curl -sSL https://dl.google.com/android/repository/android-ndk-r25b-linux.zip -o ndk.zip
+          unzip ndk.zip -d /opt/android-ndk
+          export ANDROID_NDK_HOME=/opt/android-ndk/android-ndk-r25b
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+          echo "/opt/android-ndk/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $PATH
+
+      - name: Install Cross-Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+
+      - name: Get Latest Tag
+        id: latest_tag
+        uses: pozetroninc/github-action-get-latest-release@master
+        with:
+          repository: MetaCubeX/mihomo
+          excludes: draft
+
+      - name: Versioning
+        run: |
+          sudo timedatectl set-timezone "Asia/Jakarta"
+          echo "NAME=mihomo" >> $GITHUB_ENV
+          BUILDTIME=$(date)
+          echo "BUILDTIME=$BUILDTIME" >> $GITHUB_ENV
+          HASH_COMMIT=$(git rev-parse --short HEAD)
+          echo "URL_COMMIT=https://www.github.com/metacubex/mihomo/commit/$HASH_COMMIT" >> $GITHUB_ENV
+          COMMIT=$(git log --oneline -n 5 --no-decorate | sed 's/^[0-9a-f]* //' | sed 's/^/— /')
+          echo "COMMIT=$COMMIT" >> $GITHUB_ENV
+          VERSION=${{ steps.latest_tag.outputs.release }}-${HASH_COMMIT}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAGS=with_gvisor,with_low_memory" >> $GITHUB_ENV
+          echo "LDFLAGS=-X 'github.com/metacubex/mihomo/constant.Version=${VERSION}' -X 'github.com/metacubex/mihomo/constant.BuildTime=${BUILDTIME}' -w -s -buildid=" >> $GITHUB_ENV
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: stable
+
+      - name: Build
+        run: |
+          CGO_ENABLED=1 CC=${{ matrix.target.CC }} \
+          GOARCH=${{ matrix.target.GOARCH }} GOOS=${{ matrix.target.GOOS }} \
+          go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}-${{ matrix.target.GOOS }}-${{ matrix.target.GOARCH }}
+
+      - name: Archive
+        id: archive
+        run: |
+          GZ="${NAME}-${{ matrix.target.GOOS }}-${{ matrix.target.GOARCH }}-${VERSION}.tgz"
+          tar -caf $GZ ./${NAME}-${{ matrix.target.GOOS }}-${{ matrix.target.GOARCH }}
+          echo "gz=$GZ" >> $GITHUB_OUTPUT
+          SHA=$(sha256sum $GZ | cut -d ' ' -f1)
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+        with:
+          tag_name: ${{ needs.build.outputs.VERSION }}
+          release_name: Release ${{ needs.build.outputs.VERSION }}
+          draft: false
+          prerelease: false
+
+      - name: Upload All Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ needs.build.outputs.gz }}
+          asset_name: ${{ needs.build.outputs.gz }}
+          asset_content_type: application/gzip
