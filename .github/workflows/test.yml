@@ -1,6 +1,6 @@
 name: MiHomo-Create
 on:
-  - workflow_dispatch
+  workflow_dispatch:
 
 jobs:
   build:
@@ -54,6 +54,16 @@ jobs:
           echo "TAGS=with_gvisor,with_low_memory" >> $GITHUB_ENV
           echo "LDFLAGS=-X 'github.com/metacubex/mihomo/constant.Version=${VERSION}' -X 'github.com/metacubex/mihomo/constant.BuildTime=$(date)' -w -s -buildid=" >> $GITHUB_ENV
 
+      - name: Save VERSION as artifact
+        run: |
+          echo $VERSION > version.txt
+          
+      - name: Upload VERSION Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: version
+          path: version.txt
+          
       - name: Setup NDK for Android
         if: ${{ matrix.jobs.goos == 'android' }}
         uses: nttld/setup-ndk@v1
@@ -74,8 +84,7 @@ jobs:
           GOARM: ${{matrix.jobs.goarm}}
           GOOUTPUT: ${{matrix.jobs.output}}
         run: |
-          echo "Building for ${GOOS}/${GOARCH}..."
-          go env
+          echo Building for ${GOOS}/${GOARCH}...
           go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}"
           cp mihomo mihomo-${{matrix.jobs.goos}}-${{matrix.jobs.output}}
           gzip -c mihomo-${GOOS}-${GOOUTPUT} > mihomo-${GOOS}-${GOOUTPUT}-${VERSION}.gz
@@ -97,29 +106,31 @@ jobs:
             mihomo*.zip
             version.txt
   
-  Upload:
+ Upload:
     runs-on: ubuntu-latest
-    permissions: write-all
-    needs: [build]   # Menambahkan dependensi agar upload hanya dimulai setelah build selesai
+    needs: [build]
     steps:
-      - name: Download all workflow run artifacts
+      - name: Download VERSION Artifact
         uses: actions/download-artifact@v4
         with:
-          path: bin/
-          merge-multiple: true
+          name: version
+
+      - name: Load VERSION
+        run: |
+          VERSION=$(cat version.txt)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Tag Repo
         uses: richardsimko/update-tag@v1
         with:
-          tag_name: 'Release-${VERSION}'
+          tag_name: Release-${{ env.VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Upload Release
         uses: softprops/action-gh-release@v1
-        if: ${{ success() }}
         with:
-          tag_name: 'Release-${VERSION}'
+          tag_name: Release-${{ env.VERSION }}
           files: |
             bin/*
           generate_release_notes: true
