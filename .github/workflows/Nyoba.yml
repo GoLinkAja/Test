@@ -1,4 +1,4 @@
-name: MiHomo-Create
+name: MiHomo-Test
 on:
   workflow_dispatch:
 
