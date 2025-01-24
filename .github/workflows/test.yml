@@ -94,7 +94,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
         with:
-          tag_name: ${{ env.VERSION }}
+          tag_name: ${{ env.VERSION }}  # Memastikan tag_name menggunakan versi yang telah didefinisikan
           release_name: Release ${{ env.VERSION }}
           draft: false
           prerelease: false
