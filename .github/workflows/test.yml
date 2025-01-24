@@ -61,26 +61,19 @@ jobs:
           GOOS: ${{matrix.jobs.goos}}
           GOARCH: ${{matrix.jobs.goarch}}
           GOARM: ${{matrix.jobs.goarm}}
+          GOOUTPUT: ${{matrix.jobs.output}}
         run: |
-          echo "Building for ${GOOS}/${GOARCH}..."
+          echo "Building for ${GOOS}/${GOOUTPUT}..."
           go env
-          go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}-${GOOS}-${GOARCH}
-          echo "Build complete. Checking for the file:"
-          ls -la
-
-      - name: Check for binary before archiving
-        run: |
-          if [ ! -f ./${NAME}-${GOOS}-${GOARCH} ]; then
-            echo "Error: Binary not found for ${GOOS}/${GOARCH}!"
-            exit 1
-          fi
+          go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}
+          echo 'go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}'
 
       - name: Archive
         id: archive
         run: |
           # Archive the build output with a unique name
-          GZ="${NAME}-${GOOS}-${GOARCH}-${VERSION}.tgz"
-          tar -caf $GZ ./${NAME}-${GOOS}-${GOARCH}
+          GZ="${NAME}-${GOOS}-${GOOUTPUT}-${VERSION}.tgz"
+          tar -caf $GZ ./${NAME}
           echo "gz=$GZ" >> $GITHUB_OUTPUT
           SHA=$(cat $GZ 2>/dev/null | sha256sum | cut -d ' ' -f1)
           echo "sha=$SHA" >> $GITHUB_OUTPUT
@@ -100,7 +93,7 @@ jobs:
           prerelease: false
 
       - name: Upload Release Asset for Linux ARM64
-        if: ${{ matrix.jobs.goos == 'linux' && matrix.jobs.goarch == 'arm64' }}
+        if: ${{ matrix.jobs.goos == 'linux' }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
@@ -111,7 +104,7 @@ jobs:
           asset_content_type: application/gzip
 
       - name: Upload Release Asset for Android ARM64
-        if: ${{ matrix.jobs.goos == 'android' && matrix.jobs.goarch == 'arm64' }}
+        if: ${{ matrix.jobs.goos == 'android' }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
