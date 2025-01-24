@@ -81,6 +81,11 @@ jobs:
       
       - name: Archive Build Output
         id: archive
+        env:
+          NAME: ${{ env.NAME }}
+          GOOS: ${{ matrix.jobs.goos }}
+          GOOUTPUT: ${{ matrix.jobs.output }}
+          VERSION: ${{ env.VERSION }}
         run: |
           ARCHIVE_NAME="${NAME}-${GOOS}-${GOOUTPUT}-${VERSION}.tgz"
           echo "Creating archive: ${ARCHIVE_NAME}"
