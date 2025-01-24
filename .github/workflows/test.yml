@@ -91,6 +91,7 @@ jobs:
           cp mihomo mihomo-${GOOS}-${GOOUTPUT}
           gzip -c mihomo-${GOOS}-${GOOUTPUT} > mihomo-${GOOS}-${GOOUTPUT}-${VERSION}.gz
           rm mihomo-${GOOS}-${GOOUTPUT}
+          ls -a
 
       - name: Save Version
         run: echo "${{ env.VERSION }}" > version.txt
@@ -102,6 +103,7 @@ jobs:
           path: |
             mihomo*.gz
             version.txt
+          if-no-file-found: warn
 
   upload:
     runs-on: ubuntu-latest
@@ -114,7 +116,7 @@ jobs:
 
       - name: Load VERSION
         run: |
-          VERSION=$(cat version.txt)
+          VERSION=$(cat bin/version.txt)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Tag Repo
