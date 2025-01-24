@@ -76,36 +76,51 @@ jobs:
         run: |
           echo "Building for ${GOOS}/${GOARCH}..."
           go env
-          go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}" -o ./${NAME}-${GOOS}-${GOOUTPUT}-${VERSION}
+          go build -tags ${TAGS} -trimpath -ldflags "${LDFLAGS}"
+          cp mihomo mihomo-${{matrix.jobs.goos}}-${{matrix.jobs.output}}
+          gzip -c mihomo-${GOOS}-${GOOUTPUT} > mihomo-${GOOS}-${GOOUTPUT}-${VERSION}.gz
+          rm mihomo-${GOOS}-${GOOUTPUT}
 
-      - name: Collect All Build Outputs
+      - name: Save version
         run: |
-          mkdir -p build_outputs
-          mv ${NAME}* build_outputs/
-          ls -lah build_outputs
+          echo ${VERSION} > version.txt
+        shell: bash
+
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: "${{ matrix.jobs.goos }}-${{ matrix.jobs.output }}"
+          path: |
+            mihomo*.gz
+            mihomo*.deb
+            mihomo*.rpm
+            mihomo*.zip
+            version.txt
   
   Upload:
     runs-on: ubuntu-latest
-    needs: build  # Menambahkan dependensi agar upload hanya dimulai setelah build selesai
+    permissions: write-all
+    needs: [build]   # Menambahkan dependensi agar upload hanya dimulai setelah build selesai
     steps:
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+      - name: Download all workflow run artifacts
+        uses: actions/download-artifact@v4
         with:
-          tag_name: ${{ env.VERSION }}  # Memastikan tag_name menggunakan versi yang telah didefinisikan
-          release_name: Release ${{ env.VERSION }}
-          draft: false
-          prerelease: false
+          path: bin/
+          merge-multiple: true
 
-      - name: Upload All Release Assets
-        run: |
-          for file in build_outputs/*; do
-            echo "Uploading $file..."
-            curl -X POST \
-              -H "Authorization: token ${{ secrets.GIT_TOKEN }}" \
-              -H "Content-Type: application/gzip" \
-              --data-binary @$file \
-              "${{ steps.create_release.outputs.upload_url }}?name=$(basename $file)"
-          done
+      - name: Tag Repo
+        uses: richardsimko/update-tag@v1
+        with:
+          tag_name: Release-${{ env.VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ success() }}
+        with:
+          tag_name: Release-${{ env.VERSION }}
+          files: |
+            bin/*
+          generate_release_notes: true
+          body_path: release.txt
