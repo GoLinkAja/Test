@@ -1,0 +1,145 @@
+name: MiHomo-Create
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        jobs:
+          - { goos: linux, goarch: arm64, output: arm64 }
+          - { goos: linux, goarch: arm, goarm: '7', output: armv7 }
+          - { goos: android, goarch: arm, ndk: armv7a-linux-androideabi34, output: armv7 }
+          - { goos: android, goarch: arm64, ndk: aarch64-linux-android34, output: arm64-v8 }
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: Alpha
+
+      - name: Get Latest Tag
+        id: latest_tag
+        uses: pozetroninc/github-action-get-latest-release@master
+        with:
+          repository: MetaCubeX/mihomo
+          excludes: prerelease, draft
+
+      - name: Set up Go
+        if: ${{ matrix.jobs.goversion == '' && matrix.jobs.abi != '1' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Set up Go
+        if: ${{ matrix.jobs.goversion != '' && matrix.jobs.abi != '1' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.jobs.goversion }}
+
+      - name: Set Time and Build Variables
+        run: |
+          sudo timedatectl set-timezone "Asia/Jakarta"
+          echo "NAME=mihomo" >> $GITHUB_ENV
+          BUILDTIME=$(date)
+          echo "BUILDTIME=$BUILDTIME" >> $GITHUB_ENV
+          HASH_COMMIT=$(git rev-parse --short HEAD)
+          echo "HASH_COMMIT=$HASH_COMMIT" >> $GITHUB_ENV
+          echo "URL_COMMIT=https://github.com/metacubex/mihomo/commit/$HASH_COMMIT" >> $GITHUB_ENV
+          VERSION="${{ steps.latest_tag.outputs.release }}-$HASH_COMMIT"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAGS=with_gvisor,with_low_memory" >> $GITHUB_ENV
+          BUILDTAG="-extldflags --static"
+          echo "GOTOOLCHAIN=local" >> $GITHUB_ENV
+          echo "LDFLAGS=$BUILDTAG -X 'github.com/metacubex/mihomo/constant.Version=$VERSION' -X 'github.com/metacubex/mihomo/constant.BuildTime=$BUILDTIME' -w -s -buildid=" >> $GITHUB_ENV
+
+      # Caching NDK
+      - name: Cache NDK
+        uses: actions/cache@v3
+        with:
+          path: ${{ runner.tool_cache }}/android-ndk
+          key: android-ndk-${{ matrix.jobs.goos }}-${{ matrix.jobs.ndk }}
+          restore-keys: |
+            android-ndk-${{ matrix.jobs.goos }}-
+
+      - name: Setup NDK
+        if: ${{ matrix.jobs.goos == 'android' }}
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r28-beta1
+
+      - name: Set NDK path
+        if: ${{ matrix.jobs.goos == 'android' }}
+        run: |
+          echo "CC=${{steps.setup-ndk.outputs.ndk-path}}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{matrix.jobs.ndk}}-clang" >> $GITHUB_ENV
+          echo "CGO_ENABLED=1" >> $GITHUB_ENV
+          echo "BUILDTAG=" >> $GITHUB_ENV
+          echo "LDFLAGS=$BUILDTAG -X 'github.com/metacubex/mihomo/constant.Version=$VERSION' -X 'github.com/metacubex/mihomo/constant.BuildTime=$BUILDTIME' -w -s -buildid=" >> $GITHUB_ENV
+
+      - name: Debug Variables
+        run: |
+          echo "VERSION: ${{ env.VERSION }}"
+          echo "TAGS: ${{ env.TAGS }}"
+          echo "LDFLAGS: ${{ env.LDFLAGS }}"
+
+      - name: Build Application
+        env:
+          GOOS: ${{ matrix.jobs.goos }}
+          GOARCH: ${{ matrix.jobs.goarch }}
+          GOARM: ${{ matrix.jobs.goarm }}
+          GOOUTPUT: ${{ matrix.jobs.output }}
+          VERSION: ${{ env.VERSION }}
+          TAGS: ${{ env.TAGS }}
+          LDFLAGS: ${{ env.LDFLAGS }}
+        run: |
+          echo "Building for $GOOS/$GOARCH..."
+          go build -tags "$TAGS" -trimpath -ldflags "$LDFLAGS"
+          cp mihomo mihomo-${GOOS}-${GOOUTPUT}
+          gzip -c mihomo-${GOOS}-${GOOUTPUT} > mihomo-${GOOS}-${GOOUTPUT}-${VERSION}.gz
+          rm mihomo-${GOOS}-${GOOUTPUT}
+          ls -a
+
+      - name: Save Version
+        run: echo "${{ env.VERSION }}" > version.txt
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: "${{ matrix.jobs.goos }}-${{ matrix.jobs.output }}"
+          path: |
+            mihomo*.gz
+            version.txt
+          if-no-file-found: warn
+
+  upload:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: bin/
+
+      - name: Load VERSION
+        run: |
+          VERSION=$(cat bin/version.txt)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Tag Repo
+        uses: richardsimko/update-tag@v1
+        with:
+          tag_name: Release-${{ env.VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: Release-${{ env.VERSION }}
+          files: |
+            bin/*
+          generate_release_notes: true
+          
