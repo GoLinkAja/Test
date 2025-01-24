@@ -73,6 +73,7 @@ jobs:
         run: |
           # Archive the build output with a unique name
           GZ="${NAME}-${GOOS}-${GOOUTPUT}-${VERSION}.tgz"
+          echo "hasil : ${GZ}"
           tar -caf $GZ ./${NAME}
           echo "gz=$GZ" >> $GITHUB_OUTPUT
           SHA=$(cat $GZ 2>/dev/null | sha256sum | cut -d ' ' -f1)
