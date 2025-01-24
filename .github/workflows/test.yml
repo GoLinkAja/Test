@@ -84,7 +84,7 @@ jobs:
           GOOUTPUT: ${{ matrix.jobs.output }}
           VERSION: ${{ env.VERSION }}
           TAGS: ${{ env.TAGS }}
-          LDFLAGS: ${{ env.LDFLAGS }} -llog
+          LDFLAGS: ${{ env.LDFLAGS }}
         run: |
           echo "Building for $GOOS/$GOARCH..."
           go build -tags "$TAGS" -trimpath -ldflags "$LDFLAGS"
