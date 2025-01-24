@@ -96,7 +96,7 @@ jobs:
           LDFLAGS: ${{ env.LDFLAGS }}
         run: |
           echo "Building for $GOOS/$GOARCH..."
-          go build -tags "$TAGS" -trimpath -ldflags "$LDFLAGS"
+          go build -v -tags "$TAGS" -trimpath -ldflags "$LDFLAGS"
           cp mihomo mihomo-${GOOS}-${GOOUTPUT}
           gzip -c mihomo-${GOOS}-${GOOUTPUT} > mihomo-${GOOS}-${GOOUTPUT}-${VERSION}.gz
           rm mihomo-${GOOS}-${GOOUTPUT}
