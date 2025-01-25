@@ -139,12 +139,11 @@ jobs:
         run: |
           VERSION=$(cat oke/version.txt)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - name: Create Tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag ${{ env.VERSION }}
-          git push origin ${{ env.VERSION }}
+          
+      - name: Tag Repo
+        uses: richardsimko/update-tag@v1
+        with:
+          tag_name: ${{env.VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
             
