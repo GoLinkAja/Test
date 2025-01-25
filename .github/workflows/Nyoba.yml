@@ -148,7 +148,6 @@ jobs:
           release_name: ${{ env.VERSION }}
           draft: false
           prerelease: false
-          generate_release_notes: true
           commitish: Alpha
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
