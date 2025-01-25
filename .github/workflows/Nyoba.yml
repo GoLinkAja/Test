@@ -113,9 +113,7 @@ jobs:
           path: |
             mihomo*.gz
             version.txt
-          if-no-file-found: warn
-          run: |
-            ls -R
+          if-no-files-found: warn
 
   upload:
     runs-on: ubuntu-latest
