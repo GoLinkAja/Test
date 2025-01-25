@@ -114,22 +114,13 @@ jobs:
         with:
           path: bin/
 
-      - name: Load VERSION
+      - name: Move to folder ok
         run: |
-          VERSION=$(cat bin/version.txt)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Tag Repo
-        uses: richardsimko/update-tag@v1
-        with:
-          tag_name: Release-${{ env.VERSION }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: Release-${{ env.VERSION }}
-          files: |
-            bin/*
-          generate_release_notes: true
+          mkdir upload
+          for i in bin/*;do
+            for ii in i/*;do
+              cp -rf ii upload
+            done
+          done
+          rm -rf bin/*
+          ls -R
