@@ -133,10 +133,33 @@ jobs:
             done
           done
           rm -rf bin
-          ls -R
+          ls -R oke
 
       - name: Load VERSION
         run: |
           VERSION=$(cat oke/version.txt)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo $VERSION
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          release_name: ${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          commitish: Alpha
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Each File to Release
+        run: |
+          for file in oke/*; do
+            echo "Uploading $file..."
+            gh release upload ${{ env.VERSION }} "$file" --clobber
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PATH: /usr/bin:$PATH
+
