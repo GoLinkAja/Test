@@ -140,25 +140,20 @@ jobs:
           VERSION=$(cat oke/version.txt)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: ${{ env.VERSION }}
-          release_name: ${{ env.VERSION }}
-          draft: false
-          prerelease: false
-          commitish: Alpha
-        env:
-          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+       - name: Create Tag
+          run: |
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag ${{ env.VERSION }}
+            git push origin ${{ env.VERSION }}
 
-      - name: Upload Each File to Release
-        run: |
-          for file in oke/*; do
-            echo "Uploading $file..."
-            gh release upload ${{ env.VERSION }} "$file" --clobber
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
-          PATH: /usr/bin:$PATH
+        - name: Display structure of downloaded files
+          run: ls -R
+  
+        - name: Upload Release
+          uses: softprops/action-gh-release@v2
+          if: ${{ success() }}
+          with:
+            tag_name: ${{env.VERSION }}
+            files: bin/*
 
