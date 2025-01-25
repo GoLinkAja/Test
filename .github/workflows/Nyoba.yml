@@ -151,7 +151,7 @@ jobs:
           generate_release_notes: true
           commitish: Alpha
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
 
       - name: Upload Each File to Release
         run: |
@@ -160,6 +160,6 @@ jobs:
             gh release upload ${{ env.VERSION }} "$file" --clobber
           done
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
           PATH: /usr/bin:$PATH
 
