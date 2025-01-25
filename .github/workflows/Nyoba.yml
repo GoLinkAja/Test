@@ -126,18 +126,12 @@ jobs:
         with:
           path: bin/
 
-      - name: Tag Repo
-        uses: richardsimko/update-tag@v1
-        with:
-          tag_name: v1.2.4
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: Release-v.1.2.4
-          files: |
-            bin/*
-          generate_release_notes: true
-          
+      - name: Move to folder
+        run: |
+          mkdir oke
+          for i in bin/*;do
+            for ii in $i/*;do
+              cp -rf $ii oke
+            done
+          done
+          ls -R
