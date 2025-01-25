@@ -151,8 +151,12 @@ jobs:
         run: ls -R
   
       - name: Upload Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         if: ${{ success() }}
         with:
           tag_name: ${{env.VERSION }}
-          files: oke/*
+          files: |
+            oke/*
+          prerelease: false
+          generate_release_notes: true
+          
