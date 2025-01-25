@@ -97,9 +97,8 @@ jobs:
         run: |
           echo "Building for $GOOS/$GOARCH..."
           go build -tags "$TAGS" -trimpath -ldflags "$LDFLAGS"
-          cp mihomo mihomo-${GOOS}-${GOOUTPUT}
-          gzip -c mihomo-${GOOS}-${GOOUTPUT} > mihomo-${GOOS}-${GOOUTPUT}-${VERSION}.gz
-          rm mihomo-${GOOS}-${GOOUTPUT}
+          gzip -c mihomo > mihomo-${GOOS}-${GOOUTPUT}-${VERSION}.gz
+          rm mihomo
 
       - name: Save Version
         run: |
