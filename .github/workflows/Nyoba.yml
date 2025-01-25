@@ -140,6 +140,11 @@ jobs:
           VERSION=$(cat oke/version.txt)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
+      - name: Delete Existing Tag
+        run: |
+          git tag -d ${{ env.VERSION }}
+          git push origin --delete ${{ env.VERSION }}
+
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
